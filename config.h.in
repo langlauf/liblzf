@@ -1,0 +1,38 @@
+/* config.h.in.  Generated automatically from configure.in by autoheader.  */
+
+/* Define to empty if the keyword does not work.  */
+#undef const
+
+/* Define if you have the ANSI C header files.  */
+#undef STDC_HEADERS
+
+/* The number of bytes in a int.  */
+#undef SIZEOF_INT
+
+/* The number of bytes in a long.  */
+#undef SIZEOF_LONG
+
+/* The number of bytes in a short.  */
+#undef SIZEOF_SHORT
+
+#if SIZEOF_SHORT == 2
+  typedef unsigned short u16;
+#elif SIZEOF_INT == 4
+  typedef unsigned int u16;
+#else
+  error need 16 bit datatype
+#endif
+
+#if SIZEOF_SHORT == 4
+  typedef unsigned short u32;
+#elif SIZEOF_INT == 4
+  typedef unsigned int u32;
+#elif SIZEOF_LONG == 4
+  typedef unsigned long u32;
+#else
+  error need 32 bit datatype
+#endif
+
+typedef	unsigned char u8;
+
+
