@@ -46,9 +46,11 @@
  * the hashing function might seem strange, just believe me
  * it works ;)
  */
-#define FRST(p) (((p[0]) << 8) + p[1])
-#define NEXT(v,p) (((v) << 8) + p[2])
-#define IDX(h) ((((h ^ (h << 5)) >> (3*8 - HLOG)) - h*5) & (HSIZE - 1))
+#ifndef FRST
+# define FRST(p) (((p[0]) << 8) | p[1])
+# define NEXT(v,p) (((v) << 8) | p[2])
+# define IDX(h) ((((h ^ (h << 5)) >> (3*8 - HLOG)) - h*5) & (HSIZE - 1))
+#endif
 /*
  * IDX works because it is very similar to a multiplicative hash, e.g.
  * ((h * 57321 >> (3*8 - HLOG)) & (HSIZE - 1))
@@ -73,8 +75,8 @@
  * compressed format
  *
  * 000LLLLL <L+1>    ; literal
- * LLLOOOOO oooooooo ; backref L
- * 111OOOOO LLLLLLLL oooooooo ; backref L+7
+ * LLLooooo oooooooo ; backref L
+ * 111ooooo LLLLLLLL oooooooo ; backref L+7
  *
  */
 
@@ -139,12 +141,12 @@ lzf_compress (const void *const in_data, unsigned int in_len,
               unsigned int maxlen = in_end - ip - len;
               maxlen = maxlen > MAX_REF ? MAX_REF : maxlen;
 
+              if (op + lit + 1 + 3 >= out_end)
+                return 0;
+
               do
                 len++;
               while (len < maxlen && ref[len] == ip[len]);
-
-              if (op + lit + 1 + 3 >= out_end)
-                return 0;
 
               if (lit)
                 {
@@ -170,12 +172,22 @@ lzf_compress (const void *const in_data, unsigned int in_len,
 
               *op++ = off;
 
-#if ULTRA_FAST
+#if ULTRA_FAST || VERY_FAST
               ip += len;
+#if VERY_FAST && !ULTRA_FAST
+              --ip;
+#endif
               hval = FRST (ip);
+
               hval = NEXT (hval, ip);
               htab[IDX (hval)] = ip;
               ip++;
+
+#if VERY_FAST && !ULTRA_FAST
+              hval = NEXT (hval, ip);
+              htab[IDX (hval)] = ip;
+              ip++;
+#endif
 #else
               do
                 {
