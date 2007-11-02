@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2005 Marc Alexander Lehmann <schmorp@schmorp.de>
+ * Copyright (c) 2000-2007 Marc Alexander Lehmann <schmorp@schmorp.de>
  * 
  * Redistribution and use in source and binary forms, with or without modifica-
  * tion, are permitted provided that the following conditions are met:
@@ -10,9 +10,6 @@
  *   2.  Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- * 
- *   3.  The name of the author may not be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  * 
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER-
@@ -43,6 +40,13 @@
 #else
 # include <errno.h>
 # define SET_ERRNO(n) errno = (n)
+#endif
+
+#if (__i386 || __amd64) && __GNUC__ >= 3
+# define lzf_movsb(dst, src, len)                \
+   asm ("rep movsb"                              \
+        : "=D" (dst), "=S" (src), "=c" (len)     \
+        :  "0" (dst),  "1" (src),  "2" (len));
 #endif
 
 unsigned int 
@@ -76,10 +80,8 @@ lzf_decompress (const void *const in_data,  unsigned int in_len,
             }
 #endif
 
-#if USE_MEMCPY
-          memcpy (op, ip, ctrl);
-          op += ctrl;
-          ip += ctrl;
+#ifdef lzf_movsb
+          lzf_movsb (op, ip, ctrl);
 #else
           do
             *op++ = *ip++;
@@ -125,12 +127,17 @@ lzf_decompress (const void *const in_data,  unsigned int in_len,
               return 0;
             }
 
+#ifdef lzf_movsb
+          len += 2;
+          lzf_movsb (op, ref, len);
+#else
           *op++ = *ref++;
           *op++ = *ref++;
 
           do
             *op++ = *ref++;
           while (--len);
+#endif
         }
     }
   while (ip < in_end);

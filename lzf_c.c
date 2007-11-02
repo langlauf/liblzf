@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2005 Marc Alexander Lehmann <schmorp@schmorp.de>
+ * Copyright (c) 2000-2007 Marc Alexander Lehmann <schmorp@schmorp.de>
  * 
  * Redistribution and use in source and binary forms, with or without modifica-
  * tion, are permitted provided that the following conditions are met:
@@ -10,9 +10,6 @@
  *   2.  Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- * 
- *   3.  The name of the author may not be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  * 
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER-
@@ -50,11 +47,12 @@
 # define FRST(p) (((p[0]) << 8) | p[1])
 # define NEXT(v,p) (((v) << 8) | p[2])
 # define IDX(h) ((((h ^ (h << 5)) >> (3*8 - HLOG)) - h*5) & (HSIZE - 1))
+/*# define IDX(h) ((ip[0] * 121 ^ ip[1] * 33 ^ ip[2] * 1) & (HSIZE-1))*/
 #endif
 /*
  * IDX works because it is very similar to a multiplicative hash, e.g.
  * ((h * 57321 >> (3*8 - HLOG)) & (HSIZE - 1))
- * the latter is also quite fast on newer CPUs, and sligthly better
+ * the latter is also quite fast on newer CPUs, and compresses similarly.
  *
  * the next one is also quite good, albeit slow ;)
  * (int)(cos(h & 0xffffff) * 1e6)
@@ -69,7 +67,14 @@
 
 #define        MAX_LIT        (1 <<  5)
 #define        MAX_OFF        (1 << 13)
-#define        MAX_REF        ((1 <<  8) + (1 << 3))
+#define        MAX_REF        ((1 << 8) + (1 << 3))
+
+#if (__i386 || __amd64) && __GNUC__ >= 3
+# define lzf_movsb(dst, src, len)                \
+   asm ("rep movsb"                              \
+        : "=D" (dst), "=S" (src), "=c" (len)     \
+        :  "0" (dst),  "1" (src),  "2" (len));
+#endif
 
 /*
  * compressed format
@@ -103,11 +108,10 @@ lzf_compress (const void *const in_data, unsigned int in_len,
            int lit = 0;
 
 #if INIT_HTAB
-# if USE_MEMCPY
-    memset (htab, 0, sizeof (htab));
-# else
-    for (hslot = htab; hslot < htab + HSIZE; hslot++)
-      *hslot++ = ip;
+  memset (htab, 0, sizeof (htab));
+# if 0
+  for (hslot = htab; hslot < htab + HSIZE; hslot++)
+    *hslot++ = ip;
 # endif
 #endif
 
@@ -213,10 +217,10 @@ lzf_compress (const void *const in_data, unsigned int in_len,
             return 0;
 
           *op++ = MAX_LIT - 1;
-#if USE_MEMCPY
-          memcpy (op, ip - MAX_LIT, MAX_LIT);
-          op += MAX_LIT;
-          lit = 0;
+
+#ifdef lzf_movsb
+          ip -= lit;
+          lzf_movsb (op, ip, lit);
 #else
           lit = -lit;
           do
@@ -232,11 +236,17 @@ lzf_compress (const void *const in_data, unsigned int in_len,
 	return 0;
 
       *op++ = lit - 1;
+#ifdef lzf_movsb
+      ip -= lit;
+      lzf_movsb (op, ip, lit);
+#else
       lit = -lit;
       do
 	*op++ = ip[lit];
       while (++lit);
+#endif
     }
 
   return op - (u8 *) out_data;
 }
+

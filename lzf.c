@@ -11,9 +11,6 @@
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
  * 
- *   3.  The name of the author may not be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER-
  * CHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
@@ -323,6 +320,9 @@ open_out (const char *name)
     m = 0;
 
   fd = open (name, O_CREAT | O_WRONLY | O_TRUNC | m, 600);
+#if defined(__MINGW32__)
+  _setmode(fd, _O_BINARY);
+#endif
   return fd;
 }
 
@@ -376,8 +376,15 @@ run_file (const char *fname)
     if (compose_name (fname, oname))
       return -1;
 
+#if !defined(__MINGW32__)
   rc = lstat (fname, &mystat);
+#else
+  rc = stat (fname, &mystat);
+#endif
   fd = open (fname, O_RDONLY);
+#if defined(__MINGW32__)
+  _setmode(fd, _O_BINARY);
+#endif
   if (rc || fd == -1)
     {
       fprintf (stderr, "%s: %s: ", imagename, fname);
@@ -423,7 +430,11 @@ run_file (const char *fname)
                  fname, nr_written == 0 ? 0 : 100.0 - nr_read / ((double) nr_written / 100.0), oname);
     }
 
+#if !defined(__MINGW32__)
   fchmod (fd2, mystat.st_mode);
+#else
+  chmod (oname, mystat.st_mode);
+#endif
   close (fd);
   close (fd2);
 
